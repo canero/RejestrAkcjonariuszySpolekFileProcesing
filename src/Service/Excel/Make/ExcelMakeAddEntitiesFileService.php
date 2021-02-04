@@ -33,6 +33,7 @@ class ExcelMakeAddEntitiesFileService implements ExcelMakeAddEntitiesFileService
      */
     private string $dir;
     private LoggerInterface $logger;
+    private array $arrayOfAddedPersons = array();
 
     /**
      * ExcelMakeAddEntitiesFileService constructor.
@@ -47,6 +48,7 @@ class ExcelMakeAddEntitiesFileService implements ExcelMakeAddEntitiesFileService
         $this->dataLoadingFileReadService = $dataLoadingFileReadService;
         $this->dir = $appKernel->getProjectDir();
         $this->logger = $logger;
+        $this->addedPersons = array();
     }
 
     /**
@@ -219,7 +221,7 @@ class ExcelMakeAddEntitiesFileService implements ExcelMakeAddEntitiesFileService
     {
         $i = 0;
         $row = 3;
-
+        $this->addedPersons =  array();
         $maxSize = sizeof($arrayOfRasSchema);
         foreach ($dataLoadingArray as $item) {
             $result = false;
@@ -246,6 +248,10 @@ class ExcelMakeAddEntitiesFileService implements ExcelMakeAddEntitiesFileService
         if (strcmp($dataLoadingFileEntity->getStatus(), 'ER: Brak klienta w bazie') !== 0) {
             return false;
         }
+
+        if($this->checkPersonInArray($rasSchemaEntity)){
+            return false;
+        }
         $personType = $this->personType($rasSchemaEntity);
         $workSheet->setCellValue('B' . $row, 'T');
         $workSheet->setCellValue('C' . $row, $rasSchemaEntity->getEntityName());
@@ -267,6 +273,12 @@ class ExcelMakeAddEntitiesFileService implements ExcelMakeAddEntitiesFileService
         $workSheet->setCellValue('AG' . $row, $rasSchemaEntity->getLandlinePhone());
         $workSheet->setCellValue('AH' . $row, $rasSchemaEntity->getEmail());
         $workSheet->setCellValue('AI' . $row, $rasSchemaEntity->getMobilePhone());
+        if(strlen($rasSchemaEntity->getPeselRegonRfi()) === 0){
+            array_push($this->arrayOfAddedPersons, trim($rasSchemaEntity->getEntityName()).trim($rasSchemaEntity->getName()).trim($rasSchemaEntity->getCity()).trim($rasSchemaEntity->getStreet()).trim($rasSchemaEntity->getHouseNumber()));
+        }else{
+            array_push($this->arrayOfAddedPersons, $rasSchemaEntity->getPeselRegonRfi());
+        }
+
         return true;
     }
 
@@ -280,7 +292,9 @@ class ExcelMakeAddEntitiesFileService implements ExcelMakeAddEntitiesFileService
             if (preg_match('/^[0-9]{11}$/', $rasSchemaEntity->getPeselRegonRfi())) {
                 return 'F';
             }
-            return 'P';
+            if(strlen($rasSchemaEntity->getPeselRegonRfi()) > 0){
+                return "P";
+            }
         }
 
         if (strlen($rasSchemaEntity->getName()) === 0) {
@@ -312,6 +326,26 @@ class ExcelMakeAddEntitiesFileService implements ExcelMakeAddEntitiesFileService
             return 'Z_FIZ';
         }
         return 'Z_PNF';
+    }
+
+
+    /**
+     * this function check repeated values
+     * @param RasSchemaEntity $rasSchemaEntity
+     * @return bool
+     */
+    private function checkPersonInArray(RasSchemaEntity $rasSchemaEntity): bool
+    {
+
+       if(strlen($rasSchemaEntity->getPeselRegonRfi())> 0){
+            if(in_array($rasSchemaEntity->getPeselRegonRfi(), $this->arrayOfAddedPersons)){
+                return true;
+            }
+       }
+        if(in_array(trim($rasSchemaEntity->getEntityName()).trim($rasSchemaEntity->getName()).trim($rasSchemaEntity->getCity()).trim($rasSchemaEntity->getStreet()).trim($rasSchemaEntity->getHouseNumber()), $this->arrayOfAddedPersons)){
+            return true;
+        }
+        return false;
     }
 
 }
